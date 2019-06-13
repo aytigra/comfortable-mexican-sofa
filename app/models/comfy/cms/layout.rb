@@ -25,6 +25,7 @@ class Comfy::Cms::Layout < ActiveRecord::Base
   validates :identifier,
     presence:   true,
     uniqueness: { scope: :site_id },
+    case_sensitive: false,
     format:     { with: %r{\A\w[a-z0-9_-]*\z}i }
 
   # -- Class Methods -----------------------------------------------------------

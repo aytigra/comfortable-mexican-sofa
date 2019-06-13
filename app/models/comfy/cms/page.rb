@@ -36,6 +36,7 @@ class Comfy::Cms::Page < ActiveRecord::Base
   validates :slug,
     presence:   true,
     uniqueness: { scope: :parent_id },
+    case_sensitve: false,
     unless:     ->(p) {
       p.site && (p.site.pages.count.zero? || p.site.pages.root == self)
     }
