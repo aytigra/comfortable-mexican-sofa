@@ -7,8 +7,10 @@ class Comfy::Cms::Page < ActiveRecord::Base
   include Comfy::Cms::WithFragments
   include Comfy::Cms::WithCategories
 
-  cms_acts_as_tree counter_cache: :children_count
+  cms_acts_as_tree counter_cache: :children_count, order: :position
   cms_has_revisions_for :fragments_attributes
+
+  attr_accessor :content
 
   # -- Relationships -----------------------------------------------------------
   belongs_to :site
@@ -45,28 +47,22 @@ class Comfy::Cms::Page < ActiveRecord::Base
 
   # -- Class Methods -----------------------------------------------------------
   # Tree-like structure for pages
-  def self.options_for_select(site:, page: nil, current_page: nil, depth: 0, exclude_self: true, spacer: ". . ")
-    return [] if (current_page ||= site.pages.root) == page && exclude_self || !current_page
-    out = []
+  def self.options_for_select(site:, current_page: nil, exclude_self: false)
+    options = []
 
-    unless current_page == page
-      out << ["#{spacer * depth}#{current_page.label}", current_page.id]
-    end
+    options_for_page = ->(page, depth = 0) do
+      return if exclude_self && page == current_page
 
-    if current_page.children_count.nonzero?
-      current_page.children.each do |child|
-        out += options_for_select(
-          site:         site,
-          page:         page,
-          current_page: child,
-          depth:        depth + 1,
-          exclude_self: exclude_self,
-          spacer:       spacer
-        )
+      options << ["#{'. . ' * depth}#{page.label}", page.id]
+
+      page.children.order(:position).each do |child_page|
+        options_for_page.call(child_page, depth + 1)
       end
     end
 
-    out.compact
+    options_for_page.call(site.pages.root)
+
+    options
   end
 
   # -- Instance Methods --------------------------------------------------------
@@ -88,8 +84,13 @@ class Comfy::Cms::Page < ActiveRecord::Base
 
   # This method will mutate page object by transfering attributes from translation
   # for a given locale.
-  def translate!(locale)
-    translation = translations.published.find_by!(locale: locale)
+  def translate!
+    # If site locale same as page's or there's no translastions, we do nothing
+    if site.locale == I18n.locale.to_s || translations.blank?
+      return
+    end
+
+    translation = translations.published.find_by!(locale: I18n.locale)
     self.layout        = translation.layout
     self.label         = translation.label
     self.content_cache = translation.content_cache

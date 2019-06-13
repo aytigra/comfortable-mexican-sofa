@@ -50,8 +50,45 @@ class Comfy::Cms::ContentControllerTest < ActionDispatch::IntegrationTest
     assert_equal true,            json_response["is_published"]
   end
 
+  def test_show_as_json_with_options
+    ComfortableMexicanSofa.config.page_to_json_options = {
+      include:  { fragments: { only: :identifier } },
+      except:   [:position]
+    }
+
+    get comfy_cms_render_page_path(cms_path: ""), as: :json
+    assert_response :success
+    assert_equal "application/json", response.content_type
+    json_response = JSON.parse(response.body)
+
+    # assert_nil json_response["position"]
+    assert_equal [
+      { "identifier" => "boolean" },
+      { "identifier" => "file" },
+      { "identifier" => "datetime" },
+      { "identifier" => "content" }
+    ], json_response["fragments"]
+  end
+
+  def test_show_as_json_with_translation
+    ComfortableMexicanSofa.config.page_to_json_options = {
+      methods: [:content],
+      include: { fragments: { only: :content } }
+    }
+
+    I18n.locale = :fr
+
+    get comfy_cms_render_page_path(cms_path: ""), as: :json
+    assert_response :success
+    assert_equal "application/json", response.content_type
+    json_response = JSON.parse(response.body)
+
+    assert_equal "Translation Content", json_response["content"]
+    assert({ "content" => "translated content" }.in?(json_response["fragments"]))
+  end
+
   def test_show_as_json_with_erb
-    @page.update_attributes(fragments_attributes: [
+    @page.update(fragments_attributes: [
       { identifier: "content", content: "{{ cms:helper pluralize, 2, monkey }}" }
     ])
     get comfy_cms_render_page_path(cms_path: ""), as: :json

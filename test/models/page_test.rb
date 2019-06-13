@@ -208,7 +208,7 @@ class CmsPageTest < ActiveSupport::TestCase
     fragment_count  = -> { Comfy::Cms::Fragment.count }
 
     assert_no_difference [page_count, fragment_count] do
-      @page.update_attributes!(fragments_attributes: [
+      @page.update!(fragments_attributes: [
         { identifier: frag.identifier,
           content:    "updated content" }
       ])
@@ -219,7 +219,7 @@ class CmsPageTest < ActiveSupport::TestCase
 
   def test_update_with_file
     assert_no_difference -> { ActiveStorage::Attachment.count } do
-      @page.update_attributes!(
+      @page.update!(
         fragments_attributes: [{
           identifier: "file",
           tag:        "file",
@@ -233,7 +233,7 @@ class CmsPageTest < ActiveSupport::TestCase
   def test_update_with_file_removal
     id = comfy_cms_fragments(:file).attachments.first.id
     assert_difference(-> { ActiveStorage::Attachment.count }, -1) do
-      @page.update_attributes!(
+      @page.update!(
         fragments_attributes: [{
           identifier:       "file",
           file_ids_destroy: [id]
@@ -251,7 +251,7 @@ class CmsPageTest < ActiveSupport::TestCase
     fragment_count  = -> { Comfy::Cms::Fragment.count }
 
     assert_no_difference [page_count, fragment_count] do
-      @page.update_attributes!(fragments_attributes: [
+      @page.update!(fragments_attributes: [
         { identifier: frag.identifier,
           datetime:   string }
       ])
@@ -268,7 +268,7 @@ class CmsPageTest < ActiveSupport::TestCase
     fragment_count  = -> { Comfy::Cms::Fragment.count }
 
     assert_no_difference [page_count, fragment_count] do
-      @page.update_attributes!(fragments_attributes: [
+      @page.update!(fragments_attributes: [
         { identifier: frag.identifier,
           boolean:    "0" }
       ])
@@ -291,7 +291,7 @@ class CmsPageTest < ActiveSupport::TestCase
     assert_equal 0, page_b.children_count
     assert_equal 0, page_c.children_count
 
-    page_c.update_attributes!(parent_id: page_b)
+    page_c.update!(parent_id: page_b)
 
     [page_a, page_b, page_c].each(&:reload)
     assert_equal 1, page_a.children_count
@@ -333,7 +333,7 @@ class CmsPageTest < ActiveSupport::TestCase
     assert_equal "/child-page/test-page-2/test-page-3", page_c.full_path
     assert_equal "/child-page/test-page-1/test-page-4", page_d.full_path
 
-    page.update_attributes!(slug: "updated-page")
+    page.update!(slug: "updated-page")
     assert_equal "/updated-page", page.full_path
     [page_a, page_b, page_c, page_d].each(&:reload)
     assert_equal "/updated-page/test-page-1", page_a.full_path
@@ -341,7 +341,7 @@ class CmsPageTest < ActiveSupport::TestCase
     assert_equal "/updated-page/test-page-2/test-page-3", page_c.full_path
     assert_equal "/updated-page/test-page-1/test-page-4", page_d.full_path
 
-    page_b.update_attributes!(parent: page_a)
+    page_b.update!(parent: page_a)
     [page_a, page_b, page_c, page_d].each(&:reload)
     assert_equal "/updated-page/test-page-1", page_a.full_path
     assert_equal "/updated-page/test-page-1/test-page-2", page_b.full_path
@@ -361,7 +361,7 @@ class CmsPageTest < ActiveSupport::TestCase
     assert_equal 1, page_b.children_count
     assert_equal 0, page_c.children_count
 
-    page_c.update_attributes!(parent: page_a)
+    page_c.update!(parent: page_a)
     [page_a, page_b].each(&:reload)
     assert_equal 2, page_a.children_count
     assert_equal 0, page_b.children_count
@@ -374,7 +374,7 @@ class CmsPageTest < ActiveSupport::TestCase
 
   def test_cascading_destroy
     assert_difference(-> { Comfy::Cms::Page.count }, -2) do
-      assert_difference(-> { Comfy::Cms::Fragment.count }, -4) do
+      assert_difference(-> { Comfy::Cms::Fragment.count }, -5) do
         assert_difference(-> { Comfy::Cms::Translation.count }, -1) do
           @page.destroy
         end
@@ -383,16 +383,16 @@ class CmsPageTest < ActiveSupport::TestCase
   end
 
   def test_options_for_select
-    assert_equal ["Default Page", ". . Child Page"],
-      Comfy::Cms::Page.options_for_select(site: @site).collect(&:first)
-    assert_equal ["Default Page"],
-      Comfy::Cms::Page.options_for_select(site: @site, page: comfy_cms_pages(:child)).collect(&:first)
-    assert_equal [],
-      Comfy::Cms::Page.options_for_select(site: @site, page: @page)
+    options = ["Default Page", ". . Child Page"]
+    assert_equal options, Comfy::Cms::Page.options_for_select(site: @site).map(&:first)
 
-    page = Comfy::Cms::Page.new(new_params(parent: @page))
-    assert_equal ["Default Page", ". . Child Page"],
-      Comfy::Cms::Page.options_for_select(site: @site, page: page).collect(&:first)
+    expected = ["Default Page"]
+    actual = Comfy::Cms::Page.options_for_select(
+      site:         @site,
+      current_page: comfy_cms_pages(:child),
+      exclude_self: true
+    ).map(&:first)
+    assert_equal expected, actual
   end
 
   def test_fragments_attributes
@@ -580,27 +580,51 @@ class CmsPageTest < ActiveSupport::TestCase
   end
 
   def test_translate
+    I18n.locale = :fr
+
     translation = comfy_cms_translations(:default)
     translation.update_columns(layout_id: comfy_cms_layouts(:nested).id)
 
-    @page.translate!(:fr)
+    @page.translate!
     assert @page.readonly?
 
     assert_equal comfy_cms_layouts(:nested), @page.layout
     assert_equal "Default Translation", @page.label
     assert_equal "Translation Content", @page.content_cache
+
+    frag = @page.fragments.find { |f| f.identifier == "content" }
+    assert_equal "translated content", frag.content
+  end
+
+  def test_translate_with_no_translations
+    I18n.locale = :fr
+    Comfy::Cms::Translation.delete_all
+
+    @page.translate!
+    assert_equal "Default Page", @page.label
+  end
+
+  def test_translate_with_default_locale
+    I18n.locale = @page.site.locale
+
+    @page.translate!
+    assert_equal "Default Page", @page.label
   end
 
   def test_translate_with_unpublished
+    I18n.locale = :fr
+
     comfy_cms_translations(:default).update_column(:is_published, false)
     assert_exception_raised ActiveRecord::RecordNotFound do
-      @page.translate!(:fr)
+      @page.translate!
     end
   end
 
   def test_translate_with_invalid_locale
+    I18n.locale = :es
+
     assert_exception_raised ActiveRecord::RecordNotFound do
-      @page.translate!(:es)
+      @page.translate!
     end
   end
 

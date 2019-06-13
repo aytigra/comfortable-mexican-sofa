@@ -61,7 +61,7 @@ class SeedsPagesTest < ActiveSupport::TestCase
     assert_equal 1, frag.attachments.count
 
     frag = page.fragments.find_by(identifier: "attachments")
-    assert_equal 2, frag.attachments.count
+    assert_equal 3, frag.attachments.count
 
     assert_equal 2, page.categories.count
     assert_equal %w[category_a category_b], page.categories.map(&:label)
@@ -160,7 +160,7 @@ class SeedsPagesTest < ActiveSupport::TestCase
       categorized: comfy_cms_pages(:default)
     )
 
-    comfy_cms_translations(:default).update_attributes!(fragments_attributes: [
+    comfy_cms_translations(:default).update!(fragments_attributes: [
       {
         identifier: "content",
         content:    "translation content",

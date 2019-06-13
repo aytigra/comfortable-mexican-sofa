@@ -21,11 +21,11 @@ class Comfy::Cms::ContentController < Comfy::Cms::BaseController
       respond_to do |format|
         format.html { render_page }
         format.json do
-          json_page = @cms_page.as_json(except: [:content_cache])
-          json_page[:content] = render_to_string(
+          @cms_page.content = render_to_string(
             inline: @cms_page.content_cache,
             layout: false
           )
+          json_page = @cms_page.as_json(ComfortableMexicanSofa.config.page_to_json_options)
           render json: json_page
         end
       end
@@ -44,7 +44,7 @@ protected
   # it's possible to control mimetype of a page by creating a `mime_type` field
   def mime_type
     mime_block = @cms_page.fragments.detect { |f| f.identifier == "mime_type" }
-    mime_block&.content || "text/html"
+    mime_block&.content&.strip || "text/html"
   end
 
   def app_layout
@@ -73,15 +73,10 @@ protected
   # Getting page and setting content_cache and fragments data if we need to
   # serve translation data
   def find_cms_page_by_full_path(full_path)
-    @cms_page   = @cms_site.pages.published.find_by!(full_path: full_path)
-    @cms_layout = @cms_page.layout
+    @cms_page = @cms_site.pages.published.find_by!(full_path: full_path)
 
-    # There are translations for this page and locale is not the default site
-    # locale, so we need to grab translation data.
-    if @cms_page.translations.any? && @cms_site.locale != I18n.locale.to_s
-      @cms_page.translate!(I18n.locale)
-      @cms_layout = @cms_page.layout
-    end
+    @cms_page.translate!
+    @cms_layout = @cms_page.layout
 
     @cms_page
 

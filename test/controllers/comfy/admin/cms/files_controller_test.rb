@@ -68,6 +68,15 @@ class Comfy::Admin::Cms::FilesControllerTest < ActionDispatch::IntegrationTest
     }], JSON.parse(response.body)
   end
 
+  def test_get_index_with_svg_file
+    @site.files.create(
+      file: fixture_file_upload("files/image.svg", "image/svg+xml")
+    )
+
+    r :get, comfy_admin_cms_site_files_path(site_id: @site)
+    assert_response :success
+  end
+
   def test_get_new
     r :get, new_comfy_admin_cms_site_file_path(site_id: @site)
     assert_response :success
