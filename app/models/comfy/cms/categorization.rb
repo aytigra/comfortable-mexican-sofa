@@ -11,6 +11,6 @@ class Comfy::Cms::Categorization < ActiveRecord::Base
 
   # -- Validations -------------------------------------------------------------
   validates :category_id,
-    uniqueness: { scope: %i[categorized_type categorized_id] }
+    uniqueness: { scope: %i[categorized_type categorized_id], case_sensitive: false }
 
 end

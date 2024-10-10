@@ -22,13 +22,13 @@ class Comfy::Cms::Site < ActiveRecord::Base
   # -- Validations -------------------------------------------------------------
   validates :identifier,
     presence:   true,
-    uniqueness: { case_sensitive: true },
+    uniqueness: { case_sensitive: false },
     format:     { with: %r{\A\w[a-z0-9_-]*\z}i }
   validates :label,
     presence:   true
   validates :hostname,
     presence:   true,
-    uniqueness: { scope: :path, case_sensitive: true },
+    uniqueness: { scope: :path, case_sensitive: false },
     format:     { with: %r{\A[\w.-]+(?:\:\d+)?\z} }
 
   # -- Class Methods -----------------------------------------------------------
