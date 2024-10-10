@@ -4,17 +4,12 @@ class Comfy::Cms::Fragment < ActiveRecord::Base
 
   self.table_name = "comfy_cms_fragments"
 
-  serialize :content
+  serialize :content, coder: Psych
 
   attr_reader :files
 
   # -- Callbacks ---------------------------------------------------------------
-  # active_storage attachment behavior changed in rails 6 - see PR#892 for details
-  if Rails::VERSION::MAJOR >= 6
-    before_save :remove_attachments, :add_attachments
-  else
-    after_save :remove_attachments, :add_attachments
-  end
+  before_save :remove_attachments, :add_attachments
 
   # -- Relationships -----------------------------------------------------------
   belongs_to :record, polymorphic: true, touch: true
@@ -49,6 +44,9 @@ protected
 
   def add_attachments
     return if @files.blank?
+
+    # rdsun: remove existing attachments first
+    attachments.destroy_all
 
     # If we're dealing with a single file
     if tag == "file"
